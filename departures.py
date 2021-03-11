@@ -2,6 +2,8 @@ import PIL
 import requests
 import re
 import random
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dateutil import parser
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
@@ -70,9 +72,24 @@ anklamer_addr = "Anklamer+Str.+6"
 terminus_north = ["Tegel", "Borsigwerke", "Kurt-Schumacher-Platz"]
 terminus_south = ["Mariendorf", "Seestraße", "Wedding", "Naturkundemuseum", "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Tempelhof"]
 
-def get_data():
+def fetch(session, url, timeout, default=None):
     try:
-        response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=5)
+        response = session.get(url, timeout=timeout)
+    except requests.exceptions.ReadTimeout:
+        print("Failed to fetch, timeout")
+        return default
+
+    if response.status_code == 200:
+        return response.json()
+
+    return default
+
+def get_data(session=None):
+    try:
+        if session != None:
+            response = session.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
+        else:
+            response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
         # response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de&when=2021-03-11T01:50%2B01:00", timeout=5)
     except requests.exceptions.ReadTimeout:
         print("Failed to fetch departures, timeout")
@@ -83,7 +100,7 @@ def get_data():
 
     return None
 
-def get_change_time(destination, allow_suburban, allow_tram, allow_bus):
+def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus):
     query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
     if not allow_suburban:
@@ -95,17 +112,9 @@ def get_change_time(destination, allow_suburban, allow_tram, allow_bus):
     if not allow_bus:
         query += "&bus=false"
 
-    try:
-        response = requests.get(query, timeout=2)
-    except requests.exceptions.ReadTimeout:
-        return None
+    return fetch(session, query, 3.1)
 
-    if response.status_code == 200:
-        return response.json()
-
-    return None
-
-def get_change_time_home(lat, long, name, allow_suburban, allow_tram, allow_bus):
+def get_change_time_home(session, lat, long, name, allow_suburban, allow_tram, allow_bus):
     query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to.latitude={lat}&to.longitude={long}&to.address={name}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
     if not allow_suburban:
@@ -117,16 +126,7 @@ def get_change_time_home(lat, long, name, allow_suburban, allow_tram, allow_bus)
     if not allow_bus:
         query += "&bus=false"
 
-    try:
-        response = requests.get(query, timeout=2)
-    except requests.exceptions.ReadTimeout:
-        return None
-
-    if response.status_code == 200:
-        return response.json()
-
-    return None
-
+    return fetch(session, query, 3.1)
 
 def process_change_time(response):
     legs = None
@@ -196,47 +196,58 @@ class DepartureRetainer():
         self.inbound_connections = []
         self.outbound_connections_raw = [None for i in range(1)]
         self.outbound_connections = []
-        self.refresh_data()
+        loop = asyncio.get_event_loop()
+        future = asyncio.ensure_future(self.refresh_data())
+        loop.run_until_complete(future)
 
-    def refresh_data(self):
+    async def refresh_data(self):
         now = datetime.now(pytz.utc)
         if now - relativedelta(seconds=10) < self.last_refresh and len(self.departures_raw) > 0:
             return
 
-        departures = get_data()
-        if departures is not None:
-            self.departures_raw = departures
+        with requests.Session() as session:
+            departures = get_data(session=session)
+            if departures is not None:
+                self.departures_raw = departures
 
-        self.subway_departures = process_departures(departures)
+            self.subway_departures = process_departures(departures)
 
-        inbound = [
-            get_change_time(hansaplatz_id, False, False, False),
-            get_change_time_home(anklamer_lat, anklamer_lng, anklamer_addr, False, True, False),
-            get_change_time(stahlheimer_id, False, True, False),
-            get_change_time(wannsee_id, True, False, False),
-            get_change_time(prenzlauer_id, True, False, False)
-        ]
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                loop = asyncio.get_event_loop()
+                connections = [
+                    asyncio.gather(*[
+                        loop.run_in_executor(executor, get_change_time, *(session, hansaplatz_id, False, False, False)),
+                        loop.run_in_executor(executor, get_change_time_home, *(session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, stahlheimer_id, False, True, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, wannsee_id, True, False, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False))
+                    ]), asyncio.gather(*[
+                        loop.run_in_executor(executor, get_change_time, *(session, bekassinenweg_id, False, False, True))
+                    ])
+                ]
 
-        for (i, data) in enumerate(inbound):
-            if data is not None:
-                self.inbound_connections_raw[i] = data
+                response = await asyncio.gather(*connections)
+                inbound = response[0]
+                outbound = response[1]
 
-        self.inbound_connections = [process_change_time(x) for x in self.inbound_connections_raw if x is not None]
+                for (i, data) in enumerate(inbound):
+                    if data is not None:
+                        self.inbound_connections_raw[i] = data
 
-        outbound = [
-            get_change_time(bekassinenweg_id, False, False, True)
-        ]
+                self.inbound_connections = [process_change_time(x) for x in self.inbound_connections_raw if x is not None]
 
-        for (i, data) in enumerate(outbound):
-            if data is not None:
-                self.outbound_connections_raw[i] = data
+                for (i, data) in enumerate(outbound):
+                    if data is not None:
+                        self.outbound_connections_raw[i] = data
 
-        self.outbound_connections = [process_change_time(x) for x in self.outbound_connections_raw if x is not None]
+                self.outbound_connections = [process_change_time(x) for x in self.outbound_connections_raw if x is not None]
 
         self.last_refresh = now
 
     def get_display_data(self):
-        self.refresh_data()
+        loop = asyncio.get_event_loop()
+        future = asyncio.ensure_future(self.refresh_data())
+        loop.run_until_complete(future)
         result = []
         night = False
 
