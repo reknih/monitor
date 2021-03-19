@@ -2,6 +2,7 @@ import locale
 import departures
 import wetter
 import pytz
+from random import random
 from astral.sun import sun
 from datetime import datetime
 
@@ -71,6 +72,7 @@ class App:
             self.draw_clock((161, 63))
             self.draw_forecast((59, 193))
         else:
+            self.draw_background()
             self.draw_clock((400, 396), sunrise=True)
 
         self.window = tk.Tk()
@@ -209,5 +211,35 @@ class App:
             self.im.paste(icon, (pos[0] + 100, pos_y))
             self.cv.text((pos[0] + 175, pos_y + 37), f"{round(f['temperature'])}°", 0, font=self.fonts["forecast-temp"], anchor="rs", align="right")
             pos_y += 58
+
+    def draw_background(self):
+        self.forecast = wetter.fetch_forecast()
+        bg_height = round(self.HEIGHT * 0.65)
+        background = Image.new('RGBA', (self.WIDTH, bg_height), (255, 255, 255, 0))
+
+        tv_tower = Image.open("img/fernsehturm-8.png")
+        background.paste(tv_tower, (round(self.WIDTH * 0.845), bg_height - 218))
+
+        moon_phase = wetter.get_moon_phase(datetime.now(pytz.utc)).graphic_string()
+
+        if moon_phase != "new":
+            moon = Image.open(f"img/moon_l_{moon_phase}-8.png").resize((200, 200))
+            background.paste(moon, (round(self.WIDTH * 0.0625), -20))
+
+        if len(self.forecast) > 0:
+            cloud_cover = self.forecast[0]["cloud_cover"]
+            cloud_amount = max(min(7*cloud_cover/73 - 84/73, 7), 0)
+            cloud = Image.open(f"img/cloud-8.png")
+            cloud_dimensions = (147, 86)
+            cloud_band = 48
+
+            for _ in range(round(cloud_amount)):
+                scale = random() * .3 + .85
+                left = round(random() * self.WIDTH - cloud_dimensions[0] / 2)
+                offset = round(random() * cloud_band)
+                resized = cloud.resize((round(cloud_dimensions[0] * scale), round(cloud_dimensions[1] * scale)))
+                background.paste(resized, (left, 15+offset), resized.convert('RGBA'))
+
+        self.im.paste(remove_transparency(background), (0, self.HEIGHT - bg_height))
 
 app = App()

@@ -88,9 +88,9 @@ def get_data(session=None):
     try:
         if session != None:
             response = session.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
+            # response = session.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de&when=2021-03-24T01:50%2B01:00", timeout=5)
         else:
             response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
-        # response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de&when=2021-03-11T01:50%2B01:00", timeout=5)
     except requests.exceptions.ReadTimeout:
         print("Failed to fetch departures, timeout")
         return None
@@ -281,7 +281,7 @@ class DepartureRetainer():
 
 def bvg_claim():
     objekt = ["Dich", "Uns", "Bier", "Baden", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex", "Free Jazz", "uns alle", "Föderalismus", "Wowereits Vermächtnis", "Chillisauce", "Asphalt", "es bald", "im Wald"]
-    verb = ["lieben", "schieben", "sieben", "ließen", "berieben", "übertrieben", "beschrieben", "besiedeln", "ziegeln", "zerrieben", "vertiefen", "fließen", "gießen", "siezen", "striezen", "stibizen", "verdünisieren"]
+    verb = ["lieben", "schieben", "sieben", "ließen", "berieben", "übertrieben", "beschrieben", "besiedeln", "ziegeln", "zerrieben", "vertiefen", "fließen", "gießen", "siezen", "striezen", "stibitzen", "verdünisieren"]
     complete = ["statisch typisieren", "an Ort und Stelle blieben"]
 
     state = random.random()
