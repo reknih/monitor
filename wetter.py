@@ -1,4 +1,4 @@
-from wetterdienst.dwd.forecasts import DwdMosmixRequest, DwdMosmixType
+from wetterdienst.provider.dwd.forecast import DwdMosmixRequest, DwdMosmixType
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 from enum import Enum
@@ -64,54 +64,54 @@ def get_moon_phase(date):
         return MoonPhase.WANING_CRESCENT
 
 def fetch_forecast():
-    stations = DwdMosmixRequest(mosmix_type=DwdMosmixType.LARGE).filter(station_id=10382)
+    stations = DwdMosmixRequest(parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
     response = next(stations.values.query())
     now = datetime.now(pytz.utc)
 
-    twentyfour = response.df[response.df["DATE"] <= now + relativedelta(hours=25)]
-    twentyfour = twentyfour[twentyfour["DATE"] >= now - relativedelta(minutes=50)]
+    twentyfour = response.df[response.df["date"] <= now + relativedelta(hours=25)]
+    twentyfour = twentyfour[twentyfour["date"] >= now - relativedelta(minutes=50)]
 
-    cloud_selector = twentyfour["PARAMETER"] == "CLOUD_COVER_EFFECTIVE"
-    tempr_selector = twentyfour["PARAMETER"] == "TEMPERATURE_AIR_200"
-    fog_selector = twentyfour["PARAMETER"] == "PROBABILITY_FOG_LAST_1H"
-    thunder_selector = twentyfour["PARAMETER"] == "PROBABILITY_THUNDERSTORM_LAST_1H"
+    cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"
+    tempr_selector = twentyfour["parameter"] == "temperature_air_200"
+    fog_selector = twentyfour["parameter"] == "probability_fog_last_1h"
+    thunder_selector = twentyfour["parameter"] == "probability_thunderstorm_last_1h"
 
-    prec_selector = twentyfour["PARAMETER"] == "PROBABILITY_PRECIPITATION_LAST_1H"
+    prec_selector = twentyfour["parameter"] == "probability_precipitation_last_1h"
 
     # Select precipitation type based on which of these is maximal
-    rain_selector = twentyfour["PARAMETER"] == "PROBABILITY_PRECIPITATION_LIQUID_LAST_1H"
-    snow_selector = twentyfour["PARAMETER"] == "PROBABILITY_PRECIPITATION_SOLID_LAST_1H"
-    frez_selector = twentyfour["PARAMETER"] == "PROBABILITY_PRECIPITATION_FREEZING_LAST_1H"
-    drizzle_selector = twentyfour["PARAMETER"] == "PROBABILITY_DRIZZLE_LAST_1H"
+    rain_selector = twentyfour["parameter"] == "probability_precipitation_liquid_last_1h"
+    snow_selector = twentyfour["parameter"] == "probability_precipitation_solid_last_1h"
+    frez_selector = twentyfour["parameter"] == "probability_precipitation_freezing_last_1h"
+    drizzle_selector = twentyfour["parameter"] == "probability_drizzle_last_1h"
 
     forecast = []
 
     for i in range(min(len(twentyfour[cloud_selector]), 24)):
         temp_record = twentyfour[tempr_selector]
-        time = temp_record["DATE"].iloc[i]
+        time = temp_record["date"].iloc[i]
         s = sun(city.observer, date=time, tzinfo=city.timezone)
 
         day = s["dawn"] < time and s["dusk"] > time
 
         current = {
-            "temperature": round(temp_record["VALUE"].iloc[i] - 273.15, 1),
-            "cloud_cover": twentyfour[cloud_selector]["VALUE"].iloc[i],
-            "foggy": twentyfour[fog_selector]["VALUE"].iloc[i] >= 50,
-            "thunderstorm": twentyfour[thunder_selector]["VALUE"].iloc[i] >= 60,
+            "temperature": round(temp_record["value"].iloc[i] - 273.15, 1),
+            "cloud_cover": twentyfour[cloud_selector]["value"].iloc[i],
+            "foggy": twentyfour[fog_selector]["value"].iloc[i] >= 50,
+            "thunderstorm": twentyfour[thunder_selector]["value"].iloc[i] >= 60,
             "daylight": day,
             "moon": get_moon_phase(time),
             "time": time,
         }
 
         prec = {
-            "probability": twentyfour[prec_selector]["VALUE"].iloc[i],
+            "probability": twentyfour[prec_selector]["value"].iloc[i],
             "kind": PrecipitationType.RAIN
         }
 
-        rain_prob = twentyfour[rain_selector]["VALUE"].iloc[i]
-        snow_prob = twentyfour[snow_selector]["VALUE"].iloc[i]
-        frez_prob = twentyfour[frez_selector]["VALUE"].iloc[i]
-        drizzle_prob = twentyfour[drizzle_selector]["VALUE"].iloc[i]
+        rain_prob = twentyfour[rain_selector]["value"].iloc[i]
+        snow_prob = twentyfour[snow_selector]["value"].iloc[i]
+        frez_prob = twentyfour[frez_selector]["value"].iloc[i]
+        drizzle_prob = twentyfour[drizzle_selector]["value"].iloc[i]
 
         max_prob = max(rain_prob, snow_prob, frez_prob, drizzle_prob)
 
