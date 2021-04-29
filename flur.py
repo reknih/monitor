@@ -6,6 +6,7 @@ import pytz
 from random import random
 from astral.sun import sun
 from datetime import datetime
+from threading import Timer
 
 from math import ceil
 from waveshare_epd import epd7in5_HD
@@ -38,10 +39,12 @@ def remove_transparency(im, bg_colour=(255, 255, 255)):
 class App:
     WIDTH, HEIGHT = (880,528)
     def __init__(self):
-        epd = epd7in5_HD.EPD()
+        if not DEBUG:
+            self.epd = epd7in5_HD.EPD()
 
-        epd.init()
-        epd.Clear()
+            self.epd.init()
+            self.epd.Clear()
+            pass
 
         self.font_paths = {
             "regular": "fonts/OpenSans-Regular.ttf",
@@ -73,6 +76,18 @@ class App:
 
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
+        if DEBUG:
+            self.window = tk.Tk()
+            self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+            self.tkimg = ImageTk.PhotoImage(self.im)
+            tk.Label(self.window, image=self.tkimg).pack()
+            # self.window.mainloop()
+        self.refresh()
+
+
+    def refresh(self):
+        self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
+        self.cv = ImageDraw.Draw(self.im)
         self.transit = departures.DepartureRetainer()
         self.forecast = []
 
@@ -85,14 +100,16 @@ class App:
             self.draw_clock((400, 396), sunrise=True)
 
         if DEBUG:
-            self.window = tk.Tk()
-            self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
             self.tkimg = ImageTk.PhotoImage(self.im)
             tk.Label(self.window, image=self.tkimg).pack()
             self.window.mainloop()
-        
         else:
-            epd.display(epd.getbuffer(self.im))
+            self.epd.display(self.epd.getbuffer(self.im))
+            pass
+
+    def loop(self):
+        self.refresh()
+        Timer(15, self.loop)
 
     def update_departure_board(self, offset):
         depts = self.transit.get_display_data()
@@ -256,5 +273,7 @@ class App:
         self.im.paste(remove_transparency(background), (0, self.HEIGHT - bg_height))
 try:
     app = App()
+    app.loop()
 except KeyboardInterrupt:
     epd7in5_HD.epdconfig.module_exit()
+    pass
