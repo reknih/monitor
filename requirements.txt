@@ -1,0 +1,6 @@
+pytz
+python-dateutil
+astral
+wetterdienst
+Pillow
+

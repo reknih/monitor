@@ -1,3 +1,4 @@
+
 import locale
 import departures
 import wetter
@@ -7,11 +8,14 @@ from astral.sun import sun
 from datetime import datetime
 
 from math import ceil
+from waveshare_epd import epd7in5_HD
 
 import tkinter as tk
 from PIL import Image, ImageDraw, ImageTk, ImageFont
 
-locale.setlocale(locale.LC_ALL, 'de_DE')
+locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
+
+DEBUG = False
 
 def remove_transparency(im, bg_colour=(255, 255, 255)):
 
@@ -32,8 +36,13 @@ def remove_transparency(im, bg_colour=(255, 255, 255)):
         return im
 
 class App:
-    WIDTH, HEIGHT = (800,600)
+    WIDTH, HEIGHT = (880,528)
     def __init__(self):
+        epd = epd7in5_HD.EPD()
+
+        epd.init()
+        epd.Clear()
+
         self.font_paths = {
             "regular": "fonts/OpenSans-Regular.ttf",
             "bold": "fonts/OpenSans-Bold.ttf",
@@ -75,11 +84,15 @@ class App:
             self.draw_background()
             self.draw_clock((400, 396), sunrise=True)
 
-        self.window = tk.Tk()
-        self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
-        self.tkimg = ImageTk.PhotoImage(self.im)
-        tk.Label(self.window, image=self.tkimg).pack()
-        self.window.mainloop()
+        if DEBUG:
+            self.window = tk.Tk()
+            self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+            self.tkimg = ImageTk.PhotoImage(self.im)
+            tk.Label(self.window, image=self.tkimg).pack()
+            self.window.mainloop()
+        
+        else:
+            epd.display(epd.getbuffer(self.im))
 
     def update_departure_board(self, offset):
         depts = self.transit.get_display_data()
@@ -241,5 +254,7 @@ class App:
                 background.paste(resized, (left, 15+offset), resized.convert('RGBA'))
 
         self.im.paste(remove_transparency(background), (0, self.HEIGHT - bg_height))
-
-app = App()
+try:
+    app = App()
+except KeyboardInterrupt:
+    epd7in5_HD.epdconfig.module_exit()
