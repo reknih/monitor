@@ -6,6 +6,7 @@ import pytz
 from random import random
 from astral.sun import sun
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from time import sleep
 
 from math import ceil
@@ -18,33 +19,13 @@ locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
 
 DEBUG = False
 
-def remove_transparency(im, bg_colour=(255, 255, 255)):
-
-    # Only process if image has transparency (http://stackoverflow.com/a/1963146)
-    if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
-
-        # Need to convert to RGBA if LA format due to a bug in PIL (http://stackoverflow.com/a/1963146)
-        alpha = im.convert('RGBA').split()[-1]
-
-        # Create a new background image of our matt color.
-        # Must be RGBA because paste requires both images have the same format
-        # (http://stackoverflow.com/a/8720632  and  http://stackoverflow.com/a/9459208)
-        bg = Image.new("RGBA", im.size, bg_colour + (255,))
-        bg.paste(im, mask=alpha)
-        return bg
-
-    else:
-        return im
-
 class App:
     WIDTH, HEIGHT = (880,528)
     def __init__(self):
         if not DEBUG:
             self.epd = epd7in5_HD.EPD()
-
             self.epd.init()
             self.epd.Clear()
-            pass
 
         self.font_paths = {
             "regular": "fonts/OpenSans-Regular.ttf",
@@ -72,55 +53,66 @@ class App:
             "forecast-temp": ImageFont.truetype(self.font_paths["regular"], 21),
             "sunrise": ImageFont.truetype(self.font_paths["semibold"], 21)
         }
-        self.night = False
 
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
-        if DEBUG:
-            self.window = tk.Tk()
-            self.window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
-            self.tkimg = ImageTk.PhotoImage(self.im)
-            tk.Label(self.window, image=self.tkimg).pack()
-            # self.window.mainloop()
-        self.refresh()
+        self.cv.text((self.WIDTH / 2, self.HEIGHT / 2), "Initializing ...", 0, font=self.fonts["small-destination"], anchor="mm", align="center")
+        self.swap()
 
+        self.transit = departures.DepartureRetainer()
+        self.last_forecast = datetime.now(pytz.utc) - relativedelta(hours=24)
+        self.forecast = []
+        self.claim = ""
+
+        self.refresh()
 
     def refresh(self):
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
-        self.transit = departures.DepartureRetainer()
-        self.forecast = []
 
-        self.night = self.update_departure_board((75, 18))
-        if not self.night:
-            self.draw_clock((161, 43))
-            self.draw_forecast((59, 173))
+        now = datetime.now(pytz.utc)
+        if now - relativedelta(minutes=20) > self.last_forecast:
+            self.forecast = wetter.fetch_forecast()
+            self.claim = departures.bvg_claim()
+            self.last_forecast = now
+
+        is_night = self.draw_departure_board((91, 28))
+
+        if not is_night:
+            self.draw_clock((195, 42))
+            self.draw_forecast((63, 160))
         else:
             self.draw_background()
-            self.draw_clock((440, 376), sunrise=True)
-
-        if DEBUG:
-            self.tkimg = ImageTk.PhotoImage(self.im)
-            tk.Label(self.window, image=self.tkimg).pack()
-            self.window.mainloop()
-        else:
-            self.epd.display(self.epd.getbuffer(self.im))
-            pass
+            self.draw_clock((445, 373), sunrise=True)
 
     def loop(self):
-        while True:
+        if DEBUG:
             self.refresh()
-            sleep(10)
+            window = tk.Tk()
+            window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+            tkimg = ImageTk.PhotoImage(self.im)
+            tk.Label(window, image=tkimg).pack()
+            window.mainloop()
 
-    def update_departure_board(self, offset):
+        else:
+            while True:
+                self.refresh()
+                self.swap()
+                sleep(30)
+
+    def swap(self):
+        self.epd.display(self.epd.getbuffer(self.im))
+
+    def draw_departure_board(self, offset):
         depts = self.transit.get_display_data()
         night = len(depts) == 0 or depts[0]["line"] == "N6"
+
         x_pos = offset[0]
         y_pos = offset[1]
 
         if not night:
             x_pos += 269
-            y_pos += 35
+            y_pos += 15
 
         for d in depts:
             self.line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
@@ -136,10 +128,9 @@ class App:
             y_pos += 68
 
         if not night and len(depts) > 0:
-            y_pos -= 8
             icon = remove_transparency(Image.open(f"img/bvg@2x-8.png")).resize((40,36))
-            self.im.paste(icon, (x_pos, y_pos))
-            self.cv.text((x_pos + 61, y_pos + 24), departures.bvg_claim(), 0, font=self.fonts["claim"], anchor="ls", align="left")
+            self.im.paste(icon, (x_pos, y_pos - 8))
+            self.cv.text((x_pos + 61, y_pos + 16), self.claim, 0, font=self.fonts["claim"], anchor="ls", align="left")
 
         return night
 
@@ -213,13 +204,12 @@ class App:
 
         if sunrise:
             icon = remove_transparency(Image.open(f"img/sunrise.png")).resize((52, 50))
-            self.im.paste(icon, (pos[0] - 52, pos[1] + 116))
-            self.cv.text((pos[0] - 2, pos[1] + 149), sun(wetter.city.observer, date=datetime.now(pytz.utc), tzinfo=wetter.city.timezone)["sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
+            self.im.paste(icon, (pos[0] - 52, pos[1] + 100))
+            self.cv.text((pos[0] - 2, pos[1] + 133), sun(wetter.city.observer, date=datetime.now(pytz.utc), tzinfo=wetter.city.timezone)["sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
 
     def draw_forecast(self, pos):
-        self.forecast = wetter.fetch_forecast()
-        self.draw_hero_forecast((pos[0] - 18, pos[1]))
-        self.draw_hourly_forecast((pos[0], pos[1] + 122))
+        self.draw_hero_forecast(pos)
+        self.draw_hourly_forecast((pos[0] + 45, pos[1] + 129))
 
     def draw_hero_forecast(self, pos):
         if len(self.forecast) <= 0:
@@ -227,7 +217,7 @@ class App:
 
         forecast = self.forecast[0]
         icon = remove_transparency(Image.open(f"img/{wetter.get_icon(forecast)}.png")).resize((110,110))
-        self.im.paste(icon, (pos[0], pos[1]))
+        self.im.paste(icon, pos)
 
         self.cv.text((pos[0] + 115, pos[1] + 88), f"{round(forecast['temperature'])}°", 0, font=self.fonts["temperature"], anchor="ls", align="left")
 
@@ -239,12 +229,11 @@ class App:
         for f in self.forecast[1:5]:
             self.cv.text((pos[0] - 10, pos_y + 37), f["time"].strftime("%H Uhr"), 0, font=self.fonts["forecast-hour"], anchor="ls", align="left")
             icon = remove_transparency(Image.open(f"img/{wetter.get_icon(f)}.png")).resize((48,48))
-            self.im.paste(icon, (pos[0] + 100, pos_y))
-            self.cv.text((pos[0] + 175, pos_y + 37), f"{round(f['temperature'])}°", 0, font=self.fonts["forecast-temp"], anchor="rs", align="right")
+            self.im.paste(icon, (pos[0] + 98, pos_y + 3))
+            self.cv.text((pos[0] + 180, pos_y + 37), f"{round(f['temperature'])}°", 0, font=self.fonts["forecast-temp"], anchor="rs", align="right")
             pos_y += 58
 
     def draw_background(self):
-        self.forecast = wetter.fetch_forecast()
         bg_height = round(self.HEIGHT * 0.65)
         background = Image.new('RGBA', (self.WIDTH, bg_height), (255, 255, 255, 0))
 
@@ -272,6 +261,24 @@ class App:
                 background.paste(resized, (left, 15+offset), resized.convert('RGBA'))
 
         self.im.paste(remove_transparency(background), (0, self.HEIGHT - bg_height))
+
+def remove_transparency(im, bg_colour=(255, 255, 255)):
+    # Only process if image has transparency (http://stackoverflow.com/a/1963146)
+    if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
+
+        # Need to convert to RGBA if LA format due to a bug in PIL (http://stackoverflow.com/a/1963146)
+        alpha = im.convert('RGBA').split()[-1]
+
+        # Create a new background image of our matt color.
+        # Must be RGBA because paste requires both images have the same format
+        # (http://stackoverflow.com/a/8720632  and  http://stackoverflow.com/a/9459208)
+        bg = Image.new("RGBA", im.size, bg_colour + (255,))
+        bg.paste(im, mask=alpha)
+        return bg
+
+    else:
+        return im
+
 try:
     app = App()
     app.loop()
