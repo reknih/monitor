@@ -7,7 +7,7 @@ import astral
 from astral import LocationInfo, moon
 from astral.sun import sun, golden_hour
 
-city = LocationInfo("Berlin", "Germany", "Europe/Berlin", 52.55892889481825, 13.33649661919359)
+city = LocationInfo("Berlin", "Germany", "Europe/Berlin", 52.562923, 13.328471)
 
 class PrecipitationType(Enum):
     RAIN = 0

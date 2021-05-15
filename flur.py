@@ -6,7 +6,7 @@ import pytz
 from random import random
 from astral.sun import sun
 from datetime import datetime
-from threading import Timer
+from time import sleep
 
 from math import ceil
 from waveshare_epd import epd7in5_HD
@@ -91,13 +91,13 @@ class App:
         self.transit = departures.DepartureRetainer()
         self.forecast = []
 
-        self.night = self.update_departure_board((61, 38))
+        self.night = self.update_departure_board((75, 18))
         if not self.night:
-            self.draw_clock((161, 63))
-            self.draw_forecast((59, 193))
+            self.draw_clock((161, 43))
+            self.draw_forecast((59, 173))
         else:
             self.draw_background()
-            self.draw_clock((400, 396), sunrise=True)
+            self.draw_clock((440, 376), sunrise=True)
 
         if DEBUG:
             self.tkimg = ImageTk.PhotoImage(self.im)
@@ -108,8 +108,9 @@ class App:
             pass
 
     def loop(self):
-        self.refresh()
-        Timer(15, self.loop)
+        while True:
+            self.refresh()
+            sleep(10)
 
     def update_departure_board(self, offset):
         depts = self.transit.get_display_data()
@@ -162,7 +163,7 @@ class App:
         if wide:
             width = 676
         else:
-            width = 415
+            width = 450
 
         self.cv.text((start_x, pos[1] + round(dimensions[1] * 0.869143)), destination, 0, font=self.fonts[dst_font], anchor="ls", align="left")
         self.cv.text((width + orig_x, pos[1] + round(dimensions[1] * 0.869143)), ", ".join(departures), 0, font=self.fonts[tme_font], anchor="rs", align="right")

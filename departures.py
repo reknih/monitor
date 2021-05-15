@@ -65,9 +65,9 @@ prenzlauer_id = "900000110002"
 stahlheimer_id = "900000110015"
 bekassinenweg_id = "900000091156"
 
-anklamer_lat = "52.53420"
-anklamer_lng = "13.39525"
-anklamer_addr = "Anklamer+Str.+6"
+anklamer_lat = "52.533902"
+anklamer_lng = "13.393388"
+anklamer_addr = "Anklamer+Str.+60"
 
 terminus_north = ["Tegel", "Borsigwerke", "Kurt-Schumacher-Platz"]
 terminus_south = ["Mariendorf", "Seestraße", "Wedding", "Naturkundemuseum", "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Tempelhof"]

@@ -3,4 +3,5 @@ python-dateutil
 astral
 wetterdienst
 Pillow
-
+RPi.GPIO
+spidev
