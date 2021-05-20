@@ -57,7 +57,8 @@ class App:
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
         self.cv.text((self.WIDTH / 2, self.HEIGHT / 2), "Initializing ...", 0, font=self.fonts["small-destination"], anchor="mm", align="center")
-        self.swap()
+        if DEBUG:
+            self.swap()
 
         self.transit = departures.DepartureRetainer()
         self.last_forecast = datetime.now(pytz.utc) - relativedelta(hours=24)
@@ -117,13 +118,31 @@ class App:
         for d in depts:
             self.line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
 
+            two_ring = False
             for (i, c) in enumerate(d["connections"]):
+                if c is None:
+                    continue
+
                 if i == 0:
                     y_pos += 57
-                else:
+                elif not two_ring:
                     y_pos += 45
 
-                self.line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos, y_pos), True)
+                if c["line"] == "S42" and len(d["connections"]) - 2 == i:
+                    two_ring = True
+
+                if two_ring:
+                    width = 225
+                else:
+                    width = 450
+
+                if two_ring and c["line"] != "S42":
+                    two_ring = False
+                    x_offset = 225
+                else:
+                    x_offset = 0
+
+                self.line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, width_preset=width)
 
             y_pos += 68
 
@@ -134,7 +153,7 @@ class App:
 
         return night
 
-    def line(self, product, line, destination, departures, pos, correspondance=False, wide=False):
+    def line(self, product, line, destination, departures, pos, correspondance=False, wide=False, width_preset=450):
         orig_x = pos[0]
         if correspondance:
             pos = (pos[0] + 52, pos[1])
@@ -154,7 +173,7 @@ class App:
         if wide:
             width = 676
         else:
-            width = 450
+            width = width_preset
 
         self.cv.text((start_x, pos[1] + round(dimensions[1] * 0.869143)), destination, 0, font=self.fonts[dst_font], anchor="ls", align="left")
         self.cv.text((width + orig_x, pos[1] + round(dimensions[1] * 0.869143)), ", ".join(departures), 0, font=self.fonts[tme_font], anchor="rs", align="right")

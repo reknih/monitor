@@ -16,7 +16,8 @@ def normalize_station_name(name):
     name = re.sub(r"/\s?\w+$", "", name)
     name = re.sub(r"\sHauptbahnhof$", "", name)
     name = re.sub(r"\sHbf\.?$", "", name)
-    name = re.sub(r"\s?Str((\.)|aße)$", "", name)
+    name = re.sub(r"\s?Str((\.)|aße)$", "Str.", name)
+    name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark", "Friedr.-L.-Jahn-Sportp.", name)
     name = re.sub(r"^Rathaus ", "", name)
     return name
 
@@ -64,6 +65,7 @@ hansaplatz_id = "900000003101"
 prenzlauer_id = "900000110002"
 stahlheimer_id = "900000110015"
 bekassinenweg_id = "900000091156"
+westend_id = "900000026207"
 
 anklamer_lat = "52.533902"
 anklamer_lng = "13.393388"
@@ -145,6 +147,9 @@ def process_change_time(response):
         else:
             break
 
+    if next_leg >= len(legs):
+        return None
+
     arrival = parser.parse(legs[0]["arrival"])
     change_station = normalize_station_name(legs[0]["destination"]["name"])
     departure = parser.parse(legs[next_leg]["departure"])
@@ -192,7 +197,7 @@ class DepartureRetainer():
         self.last_refresh = datetime.now(pytz.utc) - relativedelta(hours=24)
         self.departures_raw = []
         self.subway_departures = {}
-        self.inbound_connections_raw = [None for i in range(5)]
+        self.inbound_connections_raw = [None for i in range(6)]
         self.inbound_connections = []
         self.outbound_connections_raw = [None for i in range(1)]
         self.outbound_connections = []
@@ -220,6 +225,7 @@ class DepartureRetainer():
                         loop.run_in_executor(executor, get_change_time_home, *(session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, stahlheimer_id, False, True, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, wannsee_id, True, False, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, westend_id, True, False, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False))
                     ]), asyncio.gather(*[
                         loop.run_in_executor(executor, get_change_time, *(session, bekassinenweg_id, False, False, True))
