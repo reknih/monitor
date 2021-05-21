@@ -69,7 +69,7 @@ def fetch_forecast():
     now = datetime.now(pytz.utc)
 
     twentyfour = response.df[response.df["date"] <= now + relativedelta(hours=25)]
-    twentyfour = twentyfour[twentyfour["date"] >= now - relativedelta(minutes=50)].fillna(0.0)
+    twentyfour = twentyfour[twentyfour["date"] >= now - relativedelta(minutes=50)]
 
     cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"
     tempr_selector = twentyfour["parameter"] == "temperature_air_200"
@@ -94,24 +94,24 @@ def fetch_forecast():
         day = s["dawn"] < time and s["dusk"] > time
 
         current = {
-            "temperature": round(temp_record["value"].iloc[i] - 273.15, 1),
-            "cloud_cover": twentyfour[cloud_selector]["value"].iloc[i],
-            "foggy": twentyfour[fog_selector]["value"].iloc[i] >= 50,
-            "thunderstorm": twentyfour[thunder_selector]["value"].iloc[i] >= 60,
+            "temperature": round(temp_record["value"].fillna(0.0).iloc[i] - 273.15, 1),
+            "cloud_cover": twentyfour[cloud_selector]["value"].fillna(0.0).iloc[i],
+            "foggy": twentyfour[fog_selector]["value"].fillna(0.0).iloc[i] >= 50,
+            "thunderstorm": twentyfour[thunder_selector]["value"].fillna(0.0).iloc[i] >= 60,
             "daylight": day,
             "moon": get_moon_phase(time),
             "time": time,
         }
 
         prec = {
-            "probability": twentyfour[prec_selector]["value"].iloc[i],
+            "probability": twentyfour[prec_selector]["value"].fillna(0.0).iloc[i],
             "kind": PrecipitationType.RAIN
         }
 
-        rain_prob = twentyfour[rain_selector]["value"].iloc[i]
-        snow_prob = twentyfour[snow_selector]["value"].iloc[i]
-        frez_prob = twentyfour[frez_selector]["value"].iloc[i]
-        drizzle_prob = twentyfour[drizzle_selector]["value"].iloc[i]
+        rain_prob = twentyfour[rain_selector]["value"].fillna(0.0).iloc[i]
+        snow_prob = twentyfour[snow_selector]["value"].fillna(0.0).iloc[i]
+        frez_prob = twentyfour[frez_selector]["value"].fillna(0.0).iloc[i]
+        drizzle_prob = twentyfour[drizzle_selector]["value"].fillna(0.0).iloc[i]
 
         max_prob = max(rain_prob, snow_prob, frez_prob, drizzle_prob)
 

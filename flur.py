@@ -57,7 +57,7 @@ class App:
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
         self.cv.text((self.WIDTH / 2, self.HEIGHT / 2), "Initializing ...", 0, font=self.fonts["small-destination"], anchor="mm", align="center")
-        if DEBUG:
+        if not DEBUG:
             self.swap()
 
         self.transit = departures.DepartureRetainer()
@@ -142,7 +142,7 @@ class App:
                 else:
                     x_offset = 0
 
-                self.line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, width_preset=width)
+                self.line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=night, width_preset=width)
 
             y_pos += 68
 
