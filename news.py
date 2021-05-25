@@ -1,5 +1,6 @@
-import feedparser
 import time
+
+import feedparser
 
 def parse_feed(url):
     d = feedparser.parse(url)

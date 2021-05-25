@@ -1,13 +1,14 @@
-import PIL
-import requests
-import re
-import random
+from datetime import datetime
 import asyncio
+import logging
+import random
+import re
+
 from concurrent.futures import ThreadPoolExecutor
 from dateutil import parser
-from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
 import pytz
+import requests
 
 def normalize_station_name(name):
     name = re.sub(r"^(U|S)(\+U)? ", "", name)
@@ -19,6 +20,7 @@ def normalize_station_name(name):
     name = re.sub(r"\sStr((\.)|aße)$", " Str.", name)
     name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark", "Friedr.-L.-Jahn-Sportp.", name)
     name = re.sub(r"^Rathaus ", "", name)
+    name = re.sub(r"^Betriebshof ", "BVG-Hof ", name)
     return name
 
 def group_by_direction(departures):
@@ -78,7 +80,7 @@ def fetch(session, url, timeout, default=None):
     try:
         response = session.get(url, timeout=timeout)
     except requests.exceptions.ReadTimeout:
-        print("Failed to fetch, timeout")
+        logging.warn("Failed to fetch due to timeout")
         return default
 
     if response.status_code == 200:
@@ -94,7 +96,7 @@ def get_data(session=None):
         else:
             response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
     except requests.exceptions.ReadTimeout:
-        print("Failed to fetch departures, timeout")
+        logging.warn("Failed to fetch departures due to timeout")
         return None
 
     if response.status_code == 200:
@@ -133,7 +135,7 @@ def get_change_time_home(session, lat, long, name, allow_suburban, allow_tram, a
 def process_change_time(response):
     legs = None
     for journey in response["journeys"]:
-        if parser.parse(journey["legs"][0]["departure"]) > datetime.now(pytz.utc) + relativedelta(seconds=30):
+        if parser.parse(get_departure(journey["legs"][0])) > datetime.now(pytz.utc) + relativedelta(seconds=30):
             legs = journey["legs"]
             break
 
@@ -150,9 +152,9 @@ def process_change_time(response):
     if next_leg >= len(legs):
         return None
 
-    arrival = parser.parse(legs[0]["arrival"])
+    arrival = parser.parse(get_arrival(legs[0]))
     change_station = normalize_station_name(legs[0]["destination"]["name"])
-    departure = parser.parse(legs[next_leg]["departure"])
+    departure = parser.parse(get_departure(legs[next_leg]))
     line = legs[next_leg]["line"]["name"]
 
     if line == "S41" or line == "S42":
@@ -173,6 +175,12 @@ def process_change_time(response):
         "change_station": change_station,
         "product": legs[next_leg]["line"]["product"]
     }
+
+def get_departure(leg):
+    return leg["departure"] or leg["plannedDeparture"]
+
+def get_arrival(leg):
+    return leg["arrival"] or leg["plannedArrival"]
 
 def process_departures(departures):
     if departures is None:
@@ -201,14 +209,13 @@ class DepartureRetainer():
         self.inbound_connections = []
         self.outbound_connections_raw = [None for i in range(1)]
         self.outbound_connections = []
-        loop = asyncio.get_event_loop()
-        future = asyncio.ensure_future(self.refresh_data())
-        loop.run_until_complete(future)
 
     async def refresh_data(self):
         now = datetime.now(pytz.utc)
         if now - relativedelta(seconds=10) < self.last_refresh and len(self.departures_raw) > 0:
             return
+
+        logging.info("Fetching departures")
 
         with requests.Session() as session:
             departures = get_data(session=session)
@@ -281,6 +288,7 @@ class DepartureRetainer():
                 break
 
         if night:
+            logging.info("Reversing departures due to night mode")
             result.reverse()
 
         return result

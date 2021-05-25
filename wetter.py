@@ -1,11 +1,14 @@
-from wetterdienst.provider.dwd.forecast import DwdMosmixRequest, DwdMosmixType
 from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
 from enum import Enum
-import pytz
-import astral
+import logging
+import os
+import sys
+
 from astral import LocationInfo, moon
 from astral.sun import sun, golden_hour
+from dateutil.relativedelta import relativedelta
+from wetterdienst.provider.dwd.forecast import DwdMosmixRequest, DwdMosmixType
+import pytz
 
 city = LocationInfo("Berlin", "Germany", "Europe/Berlin", 52.562923, 13.328471)
 
@@ -64,9 +67,20 @@ def get_moon_phase(date):
         return MoonPhase.WANING_CRESCENT
 
 def fetch_forecast():
+    logging.info("Fetching forecast")
+
+    logger = logging.getLogger()
+    prev_stderr = sys.stderr
+    prev_level = logger.level
+    sys.stderr = open(os.devnull, 'w')
+    logger.setLevel(logging.WARN)
+
     stations = DwdMosmixRequest(parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
     response = next(stations.values.query())
     now = datetime.now(pytz.utc)
+
+    sys.stderr = prev_stderr
+    logger.setLevel(prev_level)
 
     twentyfour = response.df[response.df["date"] <= now + relativedelta(hours=25)]
     twentyfour = twentyfour[twentyfour["date"] >= now]

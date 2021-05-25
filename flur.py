@@ -1,31 +1,37 @@
-
-import locale
-import departures
-import wetter
-import pytz
-from random import random
-from astral.sun import sun
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from time import sleep
-
 from math import ceil
-from waveshare_epd import epd7in5_HD
+from random import random
+from time import sleep
+import sys
+import locale
+import logging
 
-import tkinter as tk
+from astral.sun import sun
 from PIL import Image, ImageDraw, ImageTk, ImageFont
+import pytz
+
+import departures
+import wetter
+
+DEBUG = "--debug" in sys.argv
+REFRESH = 5
+
+if DEBUG:
+    import tkinter as tk
+else:
+    from waveshare_epd import epd7in5_HD
 
 locale.setlocale(locale.LC_ALL, 'de_DE.UTF-8')
-
-DEBUG = False
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)-8s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 class App:
     WIDTH, HEIGHT = (880,528)
     def __init__(self):
-        if not DEBUG:
-            self.epd = epd7in5_HD.EPD()
-            self.epd.init()
-            self.epd.Clear()
+        logging.info("Starting")
 
         self.font_paths = {
             "regular": "fonts/OpenSans-Regular.ttf",
@@ -57,7 +63,18 @@ class App:
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
         self.cv.text((self.WIDTH / 2, self.HEIGHT / 2), "Initializing ...", 0, font=self.fonts["small-destination"], anchor="mm", align="center")
-        if not DEBUG:
+
+        if DEBUG:
+            self.root = tk.Tk()
+            self.root.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+            self.tkimg = ImageTk.PhotoImage(self.im)
+            self.label = tk.Label(self.root, image=self.tkimg)
+            self.label.pack()
+
+        else:
+            self.epd = epd7in5_HD.EPD()
+            self.epd.init()
+            self.epd.Clear()
             self.swap()
 
         self.transit = departures.DepartureRetainer()
@@ -65,9 +82,9 @@ class App:
         self.forecast = []
         self.claim = ""
 
-        self.refresh()
-
     def refresh(self):
+        logging.info("Refreshing")
+
         self.im = Image.new('L', (self.WIDTH, self.HEIGHT), 255)
         self.cv = ImageDraw.Draw(self.im)
 
@@ -86,27 +103,39 @@ class App:
             self.draw_background()
             self.draw_clock((445, 373), sunrise=True)
 
+        self.swap()
+
+        if DEBUG:
+            self.root.after(1000 * REFRESH, self.refresh)
+
     def loop(self):
         if DEBUG:
-            self.refresh()
-            window = tk.Tk()
-            window.geometry(f"{self.WIDTH}x{self.HEIGHT}")
-            tkimg = ImageTk.PhotoImage(self.im)
-            tk.Label(window, image=tkimg).pack()
-            window.mainloop()
+            self.root.after(100, self.refresh)
+            self.root.mainloop()
 
         else:
             while True:
                 self.refresh()
-                self.swap()
-                sleep(30)
+                sleep(REFRESH)
 
     def swap(self):
-        self.epd.display(self.epd.getbuffer(self.im))
+        logging.info("Swapping")
+
+        if DEBUG:
+            self.tkimg = ImageTk.PhotoImage(self.im)
+            self.label.configure(image=self.tkimg)
+        else:
+            self.epd.display(self.epd.getbuffer(self.im))
 
     def draw_departure_board(self, offset):
         depts = self.transit.get_display_data()
-        night = len(depts) == 0 or depts[0]["line"] == "N6"
+
+        empty = len(depts) == 0
+        night = empty or depts[0]["line"] == "N6"
+        if empty:
+            logging.info(f"Setting night mode because there are no departures")
+        elif night:
+            logging.info("Setting to night mode because N6 was seen")
 
         x_pos = offset[0]
         y_pos = offset[1]
@@ -116,7 +145,7 @@ class App:
             y_pos += 15
 
         for d in depts:
-            self.line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
+            self.draw_line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
 
             two_ring = False
             for (i, c) in enumerate(d["connections"]):
@@ -142,7 +171,7 @@ class App:
                 else:
                     x_offset = 0
 
-                self.line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=night, width_preset=width)
+                self.draw_line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=night, width_preset=width)
 
             y_pos += 68
 
@@ -153,12 +182,12 @@ class App:
 
         return night
 
-    def line(self, product, line, destination, departures, pos, correspondance=False, wide=False, width_preset=450):
+    def draw_line(self, product, line, destination, departures, pos, correspondance=False, wide=False, width_preset=450):
         orig_x = pos[0]
         if correspondance:
             pos = (pos[0] + 52, pos[1])
 
-        dimensions = self.line_indicator(product, line, pos, (not correspondance) or wide, correspondance)
+        dimensions = self.draw_line_indicator(product, line, pos, (not correspondance) or wide, correspondance)
         start_x = pos[0] + dimensions[0]
 
         if correspondance:
@@ -178,7 +207,7 @@ class App:
         self.cv.text((start_x, pos[1] + round(dimensions[1] * 0.869143)), destination, 0, font=self.fonts[dst_font], anchor="ls", align="left")
         self.cv.text((width + orig_x, pos[1] + round(dimensions[1] * 0.869143)), ", ".join(departures), 0, font=self.fonts[tme_font], anchor="rs", align="right")
 
-    def line_indicator(self, product, line, pos, compact=False, small=True):
+    def draw_line_indicator(self, product, line, pos, compact=False, small=True):
         if small:
             height = 27
             font = "small-line"
@@ -301,6 +330,9 @@ def remove_transparency(im, bg_colour=(255, 255, 255)):
 try:
     app = App()
     app.loop()
-except KeyboardInterrupt:
-    epd7in5_HD.epdconfig.module_exit()
-    pass
+
+except Exception:
+    logging.exception("Fatal exception")
+
+    if not DEBUG:
+        epd7in5_HD.epdconfig.module_exit()
