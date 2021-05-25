@@ -269,11 +269,11 @@ class DepartureRetainer():
                 route = self.subway_departures[terminus]
                 route["destination"] = terminus
 
-                if route["line"] != "N6":
-                    route["connections"] = self.inbound_connections
-                else:
+                if route["line"] == "N6":
                     route["connections"] = []
                     night = True
+                else:
+                    route["connections"] = self.inbound_connections
 
                 result.append(route)
                 break
@@ -282,6 +282,9 @@ class DepartureRetainer():
             if terminus in self.subway_departures:
                 route = self.subway_departures[terminus]
                 route["destination"] = terminus
+
+                if route["line"] == "N6":
+                    night = True
 
                 route["connections"] = self.outbound_connections
                 result.append(route)
