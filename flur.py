@@ -15,7 +15,7 @@ import departures
 import wetter
 
 DEBUG = "--debug" in sys.argv
-REFRESH = 5
+REFRESH = 5 if DEBUG else 30
 
 if DEBUG:
     import tkinter as tk
