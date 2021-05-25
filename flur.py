@@ -94,13 +94,17 @@ class App:
             self.claim = departures.bvg_claim()
             self.last_forecast = now
 
-        is_night = self.draw_departure_board((91, 28))
+        depts, night = self.transit.get_display_data()
+        if night:
+            logging.info("Showing in night mode")
 
-        if not is_night:
+        if not night:
             self.draw_clock((195, 42))
             self.draw_forecast((63, 160))
+            self.draw_departure_board((360, 43), depts, night=False)
         else:
             self.draw_background()
+            self.draw_departure_board((91, 28), depts, night=True)
             self.draw_clock((445, 373), sunrise=True)
 
         self.swap()
@@ -127,22 +131,8 @@ class App:
         else:
             self.epd.display(self.epd.getbuffer(self.im))
 
-    def draw_departure_board(self, offset):
-        depts = self.transit.get_display_data()
-
-        empty = len(depts) == 0
-        night = empty or depts[0]["line"] == "N6"
-        if empty:
-            logging.info(f"Setting night mode because there are no departures")
-        elif night:
-            logging.info("Setting to night mode because N6 was seen")
-
-        x_pos = offset[0]
-        y_pos = offset[1]
-
-        if not night:
-            x_pos += 269
-            y_pos += 15
+    def draw_departure_board(self, pos, depts, night=False):
+        x_pos, y_pos = pos
 
         for d in depts:
             self.draw_line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
@@ -171,7 +161,7 @@ class App:
                 else:
                     x_offset = 0
 
-                self.draw_line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=night, width_preset=width)
+                self.draw_line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=True, width_preset=width)
 
             y_pos += 68
 

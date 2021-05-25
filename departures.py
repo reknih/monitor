@@ -205,9 +205,9 @@ class DepartureRetainer():
         self.last_refresh = datetime.now(pytz.utc) - relativedelta(hours=24)
         self.departures_raw = []
         self.subway_departures = {}
-        self.inbound_connections_raw = [None for i in range(6)]
+        self.inbound_connections_raw = [None] * 6
         self.inbound_connections = []
-        self.outbound_connections_raw = [None for i in range(1)]
+        self.outbound_connections_raw = [None] * 1
         self.outbound_connections = []
 
     async def refresh_data(self):
@@ -222,7 +222,7 @@ class DepartureRetainer():
             if departures is not None:
                 self.departures_raw = departures
 
-            self.subway_departures = process_departures(departures)
+            self.subway_departures = process_departures(self.departures_raw)
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 loop = asyncio.get_event_loop()
@@ -287,11 +287,14 @@ class DepartureRetainer():
                 result.append(route)
                 break
 
+        if len(result) == 0:
+            logging.info("No departures")
+            night = True
+
         if night:
-            logging.info("Reversing departures due to night mode")
             result.reverse()
 
-        return result
+        return result, night
 
 def bvg_claim():
     objekt = ["Dich", "Uns", "Bier", "Baden", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex", "Free Jazz", "uns alle", "Föderalismus", "Wowereits Vermächtnis", "Chillisauce", "Asphalt", "es bald", "im Wald"]
