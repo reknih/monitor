@@ -16,7 +16,7 @@ def normalize_station_name(name):
     name = re.sub(r"/\s?\w+$", "", name)
     name = re.sub(r"\sHauptbahnhof$", "", name)
     name = re.sub(r"\sHbf\.?$", "", name)
-    name = re.sub(r"\s?Str((\.)|aße)$", "Str.", name)
+    name = re.sub(r"\sStr((\.)|aße)$", " Str.", name)
     name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark", "Friedr.-L.-Jahn-Sportp.", name)
     name = re.sub(r"^Rathaus ", "", name)
     return name

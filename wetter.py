@@ -69,7 +69,7 @@ def fetch_forecast():
     now = datetime.now(pytz.utc)
 
     twentyfour = response.df[response.df["date"] <= now + relativedelta(hours=25)]
-    twentyfour = twentyfour[twentyfour["date"] >= now - relativedelta(minutes=50)]
+    twentyfour = twentyfour[twentyfour["date"] >= now]
 
     cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"
     tempr_selector = twentyfour["parameter"] == "temperature_air_200"
