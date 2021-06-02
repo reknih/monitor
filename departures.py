@@ -212,7 +212,7 @@ class DepartureRetainer():
 
     async def refresh_data(self):
         now = datetime.now(pytz.utc)
-        if now - relativedelta(seconds=10) < self.last_refresh and len(self.departures_raw) > 0:
+        if now - relativedelta(seconds=50) < self.last_refresh and len(self.departures_raw) > 0:
             return
 
         logging.info("Fetching departures")

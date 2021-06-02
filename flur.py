@@ -161,7 +161,7 @@ class App:
                 else:
                     x_offset = 0
 
-                self.draw_line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=True, width_preset=width)
+                self.draw_line(c["product"], c["line"], c["destination"], [c["stopover"]], (x_pos + x_offset, y_pos), True, wide=night, width_preset=width)
 
             y_pos += 68
 
@@ -177,7 +177,7 @@ class App:
         if correspondance:
             pos = (pos[0] + 52, pos[1])
 
-        dimensions = self.draw_line_indicator(product, line, pos, (not correspondance) or wide, correspondance)
+        dimensions = self.draw_line_indicator(product, line, pos, not correspondance, correspondance)
         start_x = pos[0] + dimensions[0]
 
         if correspondance:
