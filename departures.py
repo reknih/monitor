@@ -62,7 +62,7 @@ def delta_to_str(delta):
 # U Afrikanische Straße
 home_id = "900000011102"
 
-wannsee_id = "900000053301"
+frator_id = "900000120008"
 hansaplatz_id = "900000003101"
 prenzlauer_id = "900000110002"
 stahlheimer_id = "900000110015"
@@ -104,8 +104,8 @@ def get_data(session=None):
 
     return None
 
-def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus):
-    query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
+def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus, transfers=1):
+    query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers={transfers}&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
     if not allow_suburban:
         query += "&suburban=false"
@@ -231,7 +231,7 @@ class DepartureRetainer():
                         loop.run_in_executor(executor, get_change_time, *(session, hansaplatz_id, False, False, False)),
                         loop.run_in_executor(executor, get_change_time_home, *(session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, stahlheimer_id, False, True, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, wannsee_id, True, False, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, frator_id, False, False, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, westend_id, True, False, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False))
                     ]), asyncio.gather(*[
