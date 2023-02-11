@@ -21,6 +21,8 @@ def normalize_station_name(name):
     name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark", "Friedr.-L.-Jahn-Sportp.", name)
     name = re.sub(r"^Rathaus ", "", name)
     name = re.sub(r"^Betriebshof ", "BVG-Hof ", name)
+    name = re.sub(r"Terminal", "T", name)
+    name = re.sub(r"^Kurt-Schumacher-Platz", "Kurt-S.-Pl.", name)
     return name
 
 def group_by_direction(departures):

@@ -7,16 +7,18 @@ import sys
 from astral import LocationInfo, moon
 from astral.sun import sun, golden_hour
 from dateutil.relativedelta import relativedelta
-from wetterdienst.provider.dwd.forecast import DwdMosmixRequest, DwdMosmixType
+from wetterdienst.provider.dwd.mosmix import DwdMosmixRequest, DwdMosmixType
 import pytz
 
 city = LocationInfo("Berlin", "Germany", "Europe/Berlin", 52.562923, 13.328471)
+
 
 class PrecipitationType(Enum):
     RAIN = 0
     DRIZZLE = 1
     FREEZING = 2
     SNOW = 3
+
 
 class MoonPhase(Enum):
     NEW_MOON = 0
@@ -46,6 +48,7 @@ class MoonPhase(Enum):
         elif self.value == 7:
             return "ncrescent"
 
+
 def get_moon_phase(date):
     angle = moon.phase(date)
 
@@ -66,6 +69,7 @@ def get_moon_phase(date):
     else:
         return MoonPhase.WANING_CRESCENT
 
+
 def fetch_forecast():
     logging.info("Fetching forecast")
 
@@ -75,20 +79,22 @@ def fetch_forecast():
     sys.stderr = open(os.devnull, 'w')
     logger.setLevel(logging.WARN)
 
-    stations = DwdMosmixRequest(parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
+    stations = DwdMosmixRequest(
+        parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
     response = next(stations.values.query())
     now = datetime.now(pytz.utc)
 
     sys.stderr = prev_stderr
     logger.setLevel(prev_level)
 
-    twentyfour = response.df[response.df["date"] <= now + relativedelta(hours=25)]
+    twentyfour = response.df[response.df["date"]
+                             <= now + relativedelta(hours=25)]
     twentyfour = twentyfour[twentyfour["date"] >= now]
 
     cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"
-    tempr_selector = twentyfour["parameter"] == "temperature_air_200"
+    tempr_selector = twentyfour["parameter"] == "temperature_air_mean_200"
     fog_selector = twentyfour["parameter"] == "probability_fog_last_1h"
-    thunder_selector = twentyfour["parameter"] == "probability_thunderstorm_last_1h"
+    thunder_selector = twentyfour["parameter"] == "probability_thunder_last_1h"
 
     prec_selector = twentyfour["parameter"] == "probability_precipitation_last_1h"
 
@@ -125,7 +131,8 @@ def fetch_forecast():
         rain_prob = twentyfour[rain_selector]["value"].fillna(0.0).iloc[i]
         snow_prob = twentyfour[snow_selector]["value"].fillna(0.0).iloc[i]
         frez_prob = twentyfour[frez_selector]["value"].fillna(0.0).iloc[i]
-        drizzle_prob = twentyfour[drizzle_selector]["value"].fillna(0.0).iloc[i]
+        drizzle_prob = twentyfour[drizzle_selector]["value"].fillna(
+            0.0).iloc[i]
 
         max_prob = max(rain_prob, snow_prob, frez_prob, drizzle_prob)
 
@@ -148,6 +155,7 @@ def fetch_forecast():
         forecast.append(current)
 
     return forecast
+
 
 def get_icon(forecast):
     # clear, cloudy, overcast, day, night
