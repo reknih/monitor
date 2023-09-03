@@ -82,13 +82,13 @@ def fetch_forecast():
     stations = DwdMosmixRequest(
         parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
     response = next(stations.values.query())
+    df = response.df.to_pandas()
     now = datetime.now(pytz.utc)
 
     sys.stderr = prev_stderr
     logger.setLevel(prev_level)
 
-    twentyfour = response.df[response.df["date"]
-                             <= now + relativedelta(hours=25)]
+    twentyfour = df[df["date"] <= now + relativedelta(hours=25)]
     twentyfour = twentyfour[twentyfour["date"] >= now]
 
     cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"

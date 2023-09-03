@@ -22,7 +22,7 @@ def normalize_station_name(name):
     name = re.sub(r"^Rathaus ", "", name)
     name = re.sub(r"^Betriebshof ", "BVG-Hof ", name)
     name = re.sub(r"Terminal", "T", name)
-    name = re.sub(r"^Kurt-Schumacher-Platz", "Kurt-S.-Pl.", name)
+    name = re.sub(r"^Kurt-Schumacher-Platz", "Kutschi", name)
     return name
 
 def group_by_direction(departures):
@@ -62,20 +62,21 @@ def delta_to_str(delta):
 
 
 # U Afrikanische Straße
-home_id = "900000011102"
+home_id = "900011102"
 
-frator_id = "900000120008"
-hansaplatz_id = "900000003101"
-prenzlauer_id = "900000110002"
-stahlheimer_id = "900000110015"
-bekassinenweg_id = "900000091156"
-westend_id = "900000026207"
+frator_id = "900120008"
+hansaplatz_id = "900003101"
+prenzlauer_id = "900110002"
+anton_id = "900140011"
+bekassinenweg_id = "900091156"
+westend_id = "900026207"
+moritz_id = "900013101"
 
 anklamer_lat = "52.533902"
 anklamer_lng = "13.393388"
 anklamer_addr = "Anklamer+Str.+60"
 
-terminus_north = ["Tegel", "Borsigwerke", "Kurt-Schumacher-Platz"]
+terminus_north = ["Tegel", "Borsigwerke", "Kutschi"]
 terminus_south = ["Mariendorf", "Seestraße", "Wedding", "Naturkundemuseum", "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Tempelhof"]
 
 def fetch(session, url, timeout, default=None):
@@ -93,10 +94,9 @@ def fetch(session, url, timeout, default=None):
 def get_data(session=None):
     try:
         if session != None:
-            response = session.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
-            # response = session.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de&when=2021-03-24T01:50%2B01:00", timeout=5)
+            response = session.get(f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
         else:
-            response = requests.get(f"https://v5.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
+            response = requests.get(f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
     except requests.exceptions.ReadTimeout:
         logging.warn("Failed to fetch departures due to timeout")
         return None
@@ -107,7 +107,7 @@ def get_data(session=None):
     return None
 
 def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus, transfers=1):
-    query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers={transfers}&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
+    query = f"https://v6.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers={transfers}&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
     if not allow_suburban:
         query += "&suburban=false"
@@ -121,7 +121,7 @@ def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus,
     return fetch(session, query, 3.1)
 
 def get_change_time_home(session, lat, long, name, allow_suburban, allow_tram, allow_bus):
-    query = f"https://v5.bvg.transport.rest/journeys?from={home_id}&to.latitude={lat}&to.longitude={long}&to.address={name}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
+    query = f"https://v6.bvg.transport.rest/journeys?from={home_id}&to.latitude={lat}&to.longitude={long}&to.address={name}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
     if not allow_suburban:
         query += "&suburban=false"
@@ -207,7 +207,7 @@ class DepartureRetainer():
         self.last_refresh = datetime.now(pytz.utc) - relativedelta(hours=24)
         self.departures_raw = []
         self.subway_departures = {}
-        self.inbound_connections_raw = [None] * 6
+        self.inbound_connections_raw = [None] * 7
         self.inbound_connections = []
         self.outbound_connections_raw = [None] * 1
         self.outbound_connections = []
@@ -224,20 +224,21 @@ class DepartureRetainer():
             if departures is not None:
                 self.departures_raw = departures
 
-            self.subway_departures = process_departures(self.departures_raw)
+            self.subway_departures = process_departures(self.departures_raw['departures'])
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 loop = asyncio.get_event_loop()
                 connections = [
                     asyncio.gather(*[
+                        loop.run_in_executor(executor, get_change_time, *(session, westend_id, True, False, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False)),
+                        loop.run_in_executor(executor, get_change_time, *(session, anton_id, False, True, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, hansaplatz_id, False, False, False)),
                         loop.run_in_executor(executor, get_change_time_home, *(session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, stahlheimer_id, False, True, False)),
                         loop.run_in_executor(executor, get_change_time, *(session, frator_id, False, False, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, westend_id, True, False, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False))
+                        loop.run_in_executor(executor, get_change_time, *(session, moritz_id, False, False, True)),
                     ]), asyncio.gather(*[
-                        loop.run_in_executor(executor, get_change_time, *(session, bekassinenweg_id, False, False, True))
+                        loop.run_in_executor(executor, get_change_time, *(session, bekassinenweg_id, False, False, True)),
                     ])
                 ]
 

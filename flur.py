@@ -138,7 +138,8 @@ class App:
             self.draw_line(d["product"], d["line"], d["destination"], d["departures"], (x_pos, y_pos), wide=night)
 
             two_ring = False
-            for (i, c) in enumerate(d["connections"]):
+            conns = d["connections"]
+            for (i, c) in enumerate(conns):
                 if c is None:
                     continue
 
@@ -147,7 +148,8 @@ class App:
                 elif not two_ring:
                     y_pos += 45
 
-                if c["line"] == "S42" and len(d["connections"]) - 2 == i:
+
+                if c["line"] == "S42" and len(conns) > i + 1 and conns[i + 1]["line"] == "S41":
                     two_ring = True
 
                 if two_ring:
