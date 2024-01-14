@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw, ImageTk, ImageFont
 import pytz
 
 import departures
-import wetter
+# import wetter
 
 DEBUG = "--debug" in sys.argv
 REFRESH = 5 if DEBUG else 30
@@ -95,7 +95,7 @@ class App:
 
         now = datetime.now(pytz.utc)
         if now - relativedelta(minutes=20) > self.last_forecast:
-            self.forecast = wetter.fetch_forecast()
+            # self.forecast = wetter.fetch_forecast()
             self.claim = departures.bvg_claim()
             self.last_forecast = now
 
@@ -265,8 +265,8 @@ class App:
             icon = remove_transparency(Image.open(
                 f"img/sunrise.png")).resize((52, 50))
             self.im.paste(icon, (pos[0] - 52, pos[1] + 100))
-            self.cv.text((pos[0] - 2, pos[1] + 133), sun(wetter.city.observer, date=datetime.now(pytz.utc), tzinfo=wetter.city.timezone)[
-                         "sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
+            # self.cv.text((pos[0] - 2, pos[1] + 133), sun(wetter.city.observer, date=datetime.now(pytz.utc), tzinfo=wetter.city.timezone)[
+            #              "sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
 
     def draw_forecast(self, pos):
         self.draw_hero_forecast(pos)
@@ -277,8 +277,8 @@ class App:
             return
 
         forecast = self.forecast[0]
-        icon = remove_transparency(Image.open(
-            f"img/{wetter.get_icon(forecast)}.png")).resize((110, 110))
+        # icon = remove_transparency(Image.open(
+        #     f"img/{wetter.get_icon(forecast)}.png")).resize((110, 110))
         self.im.paste(icon, pos)
 
         self.cv.text((pos[0] + 115, pos[1] + 88), f"{round(forecast['temperature'])}°",
@@ -292,9 +292,9 @@ class App:
         for f in self.forecast[1:5]:
             self.cv.text((pos[0] - 10, pos_y + 37), f["time"].strftime("%H Uhr"),
                          0, font=self.fonts["forecast-hour"], anchor="ls", align="left")
-            icon = remove_transparency(Image.open(
-                f"img/{wetter.get_icon(f)}.png")).resize((48, 48))
-            self.im.paste(icon, (pos[0] + 98, pos_y + 3))
+            # icon = remove_transparency(Image.open(
+            #     f"img/{wetter.get_icon(f)}.png")).resize((48, 48))
+            # self.im.paste(icon, (pos[0] + 98, pos_y + 3))
             self.cv.text((pos[0] + 180, pos_y + 37), f"{round(f['temperature'])}°",
                          0, font=self.fonts["forecast-temp"], anchor="rs", align="right")
             pos_y += 58
@@ -308,13 +308,13 @@ class App:
         background.paste(
             tv_tower, (round(self.WIDTH * 0.845), bg_height - 218))
 
-        moon_phase = wetter.get_moon_phase(
-            datetime.now(pytz.utc)).graphic_string()
+        # moon_phase = wetter.get_moon_phase(
+        #     datetime.now(pytz.utc)).graphic_string()
 
-        if moon_phase != "new":
-            moon = Image.open(
-                f"img/moon_l_{moon_phase}-8.png").resize((200, 200))
-            background.paste(moon, (round(self.WIDTH * 0.0625), -20))
+        # if moon_phase != "new":
+        #     moon = Image.open(
+        #         f"img/moon_l_{moon_phase}-8.png").resize((200, 200))
+        #     background.paste(moon, (round(self.WIDTH * 0.0625), -20))
 
         if len(self.forecast) > 0:
             cloud_cover = self.forecast[0]["cloud_cover"]
