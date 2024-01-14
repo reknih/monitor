@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 import pytz
 import requests
 
+
 def normalize_station_name(name):
     name = re.sub(r"^(U|S)(\+U)? ", "", name)
     name = re.sub(r"^Alt-", "", name)
@@ -18,12 +19,14 @@ def normalize_station_name(name):
     name = re.sub(r"\sHauptbahnhof$", "", name)
     name = re.sub(r"\sHbf\.?$", "", name)
     name = re.sub(r"\sStr((\.)|aße)$", " Str.", name)
-    name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark", "Friedr.-L.-Jahn-Sportp.", name)
+    name = re.sub(r"^Friedrich-Ludwig-Jahn-Sportpark",
+                  "Friedr.-L.-Jahn-Sportp.", name)
     name = re.sub(r"^Rathaus ", "", name)
     name = re.sub(r"^Betriebshof ", "BVG-Hof ", name)
     name = re.sub(r"Terminal", "T", name)
     name = re.sub(r"^Kurt-Schumacher-Platz", "Kutschi", name)
     return name
+
 
 def group_by_direction(departures):
     by_direction = {}
@@ -36,6 +39,7 @@ def group_by_direction(departures):
             by_direction[dirct] = [departure]
     return by_direction
 
+
 def dept_to_str(departure, now):
     mmax = relativedelta(minutes=25)
     mmin = relativedelta(seconds=60)
@@ -47,6 +51,7 @@ def dept_to_str(departure, now):
         return f"{to_go.minutes}m"
     else:
         return departure.astimezone().strftime("%H:%M")
+
 
 def delta_to_str(delta):
     if (delta.minutes == 0 or (delta.minutes == 1 and delta.seconds < 30)) and delta.hours == 0 and delta.days == 0:
@@ -77,7 +82,9 @@ anklamer_lng = "13.393388"
 anklamer_addr = "Anklamer+Str.+60"
 
 terminus_north = ["Tegel", "Borsigwerke", "Kutschi"]
-terminus_south = ["Mariendorf", "Seestraße", "Wedding", "Naturkundemuseum", "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Tempelhof"]
+terminus_south = ["Mariendorf", "Seestraße", "Wedding", "Naturkundemuseum",
+                  "Hallesches Tor", "Mehringdamm", "Platz der Luftbrücke", "Tempelhof"]
+
 
 def fetch(session, url, timeout, default=None):
     try:
@@ -91,12 +98,15 @@ def fetch(session, url, timeout, default=None):
 
     return default
 
+
 def get_data(session=None):
     try:
         if session != None:
-            response = session.get(f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
+            response = session.get(
+                f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
         else:
-            response = requests.get(f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
+            response = requests.get(
+                f"https://v6.bvg.transport.rest/stops/{home_id}/departures?language=de", timeout=6.1)
     except requests.exceptions.ReadTimeout:
         logging.warn("Failed to fetch departures due to timeout")
         return None
@@ -105,6 +115,7 @@ def get_data(session=None):
         return response.json()
 
     return None
+
 
 def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus, transfers=1):
     query = f"https://v6.bvg.transport.rest/journeys?from={home_id}&to={destination}&transfers={transfers}&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
@@ -120,6 +131,7 @@ def get_change_time(session, destination, allow_suburban, allow_tram, allow_bus,
 
     return fetch(session, query, 3.1)
 
+
 def get_change_time_home(session, lat, long, name, allow_suburban, allow_tram, allow_bus):
     query = f"https://v6.bvg.transport.rest/journeys?from={home_id}&to.latitude={lat}&to.longitude={long}&to.address={name}&transfers=1&startWithWalking=false&results=2&ferry=false&express=false&regional=false"
 
@@ -133,6 +145,7 @@ def get_change_time_home(session, lat, long, name, allow_suburban, allow_tram, a
         query += "&bus=false"
 
     return fetch(session, query, 3.1)
+
 
 def process_change_time(response):
     legs = None
@@ -178,22 +191,29 @@ def process_change_time(response):
         "product": legs[next_leg]["line"]["product"]
     }
 
+
 def get_departure(leg):
     return leg["departure"] or leg["plannedDeparture"]
 
+
 def get_arrival(leg):
     return leg["arrival"] or leg["plannedArrival"]
+
 
 def process_departures(departures):
     if departures is None:
         return {}
 
-    subways = group_by_direction([departure for departure in departures if departure["line"]["product"] == "subway"])
-    busses = group_by_direction([departure for departure in departures if departure["line"]["product"] == "bus"])
+    subways = group_by_direction(
+        [departure for departure in departures if departure["line"]["product"] == "subway"])
+    busses = group_by_direction(
+        [departure for departure in departures if departure["line"]["product"] == "bus"])
 
     now = datetime.now(pytz.utc)
-    results = {k: { "product": "subway", "line": v[0]["line"]["name"], "departures": [dept_to_str(train["when"], now) for train in v if parser.parse(train["when"]) > now] } for (k,v) in subways.items()}
-    busses = {k: { "product": "bus", "line": v[0]["line"]["name"], "departures": [dept_to_str(train["when"], now) for train in v if parser.parse(train["when"]) > now] } for (k,v) in busses.items()}
+    results = {k: {"product": "subway", "line": v[0]["line"]["name"], "departures": [dept_to_str(
+        train["when"], now) for train in v if parser.parse(train["when"]) > now]} for (k, v) in subways.items()}
+    busses = {k: {"product": "bus", "line": v[0]["line"]["name"], "departures": [dept_to_str(
+        train["when"], now) for train in v if parser.parse(train["when"]) > now]} for (k, v) in busses.items()}
 
     if len(results) < 2:
         for (k, v) in busses.items():
@@ -201,6 +221,7 @@ def process_departures(departures):
                 results[k] = v
 
     return results
+
 
 class DepartureRetainer():
     def __init__(self):
@@ -224,25 +245,36 @@ class DepartureRetainer():
             if departures is not None:
                 self.departures_raw = departures
 
-            self.subway_departures = process_departures(self.departures_raw['departures'])
+            self.subway_departures = process_departures(
+                self.departures_raw['departures'])
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 loop = asyncio.get_event_loop()
                 connections = [
                     asyncio.gather(*[
-                        loop.run_in_executor(executor, get_change_time, *(session, westend_id, True, False, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, prenzlauer_id, True, False, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, anton_id, False, True, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, hansaplatz_id, False, False, False)),
-                        loop.run_in_executor(executor, get_change_time_home, *(session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, frator_id, False, False, False)),
-                        loop.run_in_executor(executor, get_change_time, *(session, moritz_id, False, False, True)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, westend_id, True, False, False)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, prenzlauer_id, True, False, False)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, anton_id, False, True, False)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, hansaplatz_id, False, False, False)),
+                        loop.run_in_executor(executor, get_change_time_home, *(
+                            session, anklamer_lat, anklamer_lng, anklamer_addr, False, True, False)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, frator_id, False, False, False)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, moritz_id, False, False, True)),
                     ]), asyncio.gather(*[
-                        loop.run_in_executor(executor, get_change_time, *(session, bekassinenweg_id, False, False, True)),
+                        loop.run_in_executor(
+                            executor, get_change_time, *(session, bekassinenweg_id, False, False, True)),
                     ])
                 ]
 
                 response = await asyncio.gather(*connections)
+                logging.info("Processing departures")
+
                 inbound = response[0]
                 outbound = response[1]
 
@@ -250,13 +282,15 @@ class DepartureRetainer():
                     if data is not None:
                         self.inbound_connections_raw[i] = data
 
-                self.inbound_connections = [process_change_time(x) for x in self.inbound_connections_raw if x is not None]
+                self.inbound_connections = [process_change_time(
+                    x) for x in self.inbound_connections_raw if x is not None]
 
                 for (i, data) in enumerate(outbound):
                     if data is not None:
                         self.outbound_connections_raw[i] = data
 
-                self.outbound_connections = [process_change_time(x) for x in self.outbound_connections_raw if x is not None]
+                self.outbound_connections = [process_change_time(
+                    x) for x in self.outbound_connections_raw if x is not None]
 
         self.last_refresh = now
 
@@ -302,9 +336,12 @@ class DepartureRetainer():
 
         return result, night
 
+
 def bvg_claim():
-    objekt = ["Dich", "Uns", "Bier", "Baden", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex", "Free Jazz", "uns alle", "Föderalismus", "Wowereits Vermächtnis", "Chillisauce", "Asphalt", "es bald", "im Wald"]
-    verb = ["lieben", "schieben", "sieben", "ließen", "berieben", "übertrieben", "beschrieben", "besiedeln", "ziegeln", "zerrieben", "vertiefen", "fließen", "gießen", "siezen", "striezen", "stibitzen", "verdünisieren"]
+    objekt = ["Dich", "Uns", "Bier", "Baden", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex",
+              "Free Jazz", "uns alle", "Föderalismus", "Wowereits Vermächtnis", "Chillisauce", "Asphalt", "es bald", "im Wald"]
+    verb = ["lieben", "schieben", "sieben", "ließen", "berieben", "übertrieben", "beschrieben", "besiedeln",
+            "ziegeln", "zerrieben", "vertiefen", "fließen", "gießen", "siezen", "striezen", "stibitzen", "verdünisieren"]
     complete = ["statisch typisieren", "an Ort und Stelle blieben"]
 
     state = random.random()

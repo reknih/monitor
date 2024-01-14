@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 import logging
 import os
@@ -9,6 +9,7 @@ from astral.sun import sun, golden_hour
 from dateutil.relativedelta import relativedelta
 from wetterdienst.provider.dwd.mosmix import DwdMosmixRequest, DwdMosmixType
 import pytz
+import polars as pl
 
 city = LocationInfo("Berlin", "Germany", "Europe/Berlin", 52.562923, 13.328471)
 
@@ -82,57 +83,70 @@ def fetch_forecast():
     stations = DwdMosmixRequest(
         parameter="large", mosmix_type=DwdMosmixType.LARGE).filter_by_station_id(station_id=10382)
     response = next(stations.values.query())
-    df = response.df.to_pandas()
+    logging.info("Processing forecast")
+
+    df = response.df
     now = datetime.now(pytz.utc)
 
     sys.stderr = prev_stderr
     logger.setLevel(prev_level)
 
-    twentyfour = df[df["date"] <= now + relativedelta(hours=25)]
-    twentyfour = twentyfour[twentyfour["date"] >= now]
+    twentyfour = df.filter(pl.col("date") <= now + relativedelta(hours=25))
+    twentyfour = twentyfour.filter(pl.col("date") >= now)
 
-    cloud_selector = twentyfour["parameter"] == "cloud_cover_effective"
-    tempr_selector = twentyfour["parameter"] == "temperature_air_mean_200"
-    fog_selector = twentyfour["parameter"] == "probability_fog_last_1h"
-    thunder_selector = twentyfour["parameter"] == "probability_thunder_last_1h"
+    cloud_selector = pl.col("parameter") == "cloud_cover_effective"
+    tempr_selector = pl.col("parameter") == "temperature_air_mean_200"
+    fog_selector = pl.col("parameter") == "probability_fog_last_1h"
+    thunder_selector = pl.col("parameter") == "probability_thunder_last_1h"
 
-    prec_selector = twentyfour["parameter"] == "probability_precipitation_last_1h"
+    prec_selector = pl.col("parameter") == "probability_precipitation_last_1h"
 
     # Select precipitation type based on which of these is maximal
-    rain_selector = twentyfour["parameter"] == "probability_precipitation_liquid_last_1h"
-    snow_selector = twentyfour["parameter"] == "probability_precipitation_solid_last_1h"
-    frez_selector = twentyfour["parameter"] == "probability_precipitation_freezing_last_1h"
-    drizzle_selector = twentyfour["parameter"] == "probability_drizzle_last_1h"
+    rain_selector = pl.col(
+        "parameter") == "probability_precipitation_liquid_last_1h"
+    snow_selector = pl.col(
+        "parameter") == "probability_precipitation_solid_last_1h"
+    frez_selector = pl.col(
+        "parameter") == "probability_precipitation_freezing_last_1h"
+    drizzle_selector = pl.col("parameter") == "probability_drizzle_last_1h"
 
     forecast = []
 
-    for i in range(min(len(twentyfour[cloud_selector]), 24)):
-        temp_record = twentyfour[tempr_selector]
-        time = temp_record["date"].iloc[i]
+    temp_record = twentyfour.filter(tempr_selector)
+    cloud_record = twentyfour.filter(cloud_selector)["value"]
+    fog_record = twentyfour.filter(fog_selector)["value"]
+    thunder_record = twentyfour.filter(thunder_selector)["value"]
+    rain_record = twentyfour.filter(rain_selector)["value"]
+    snow_record = twentyfour.filter(snow_selector)["value"]
+    frez_record = twentyfour.filter(frez_selector)["value"]
+    drizzle_record = twentyfour.filter(drizzle_selector)["value"]
+
+    for i in range(min(len(twentyfour.filter(cloud_selector)), 24)):
+        time = temp_record["date"][i]
+
         s = sun(city.observer, date=time, tzinfo=city.timezone)
 
         day = s["dawn"] < time and s["dusk"] > time
 
         current = {
-            "temperature": round(temp_record["value"].fillna(0.0).iloc[i] - 273.15, 1),
-            "cloud_cover": twentyfour[cloud_selector]["value"].fillna(0.0).iloc[i],
-            "foggy": twentyfour[fog_selector]["value"].fillna(0.0).iloc[i] >= 50,
-            "thunderstorm": twentyfour[thunder_selector]["value"].fillna(0.0).iloc[i] >= 60,
+            "temperature": round(temp_record["value"][i] - 273.15, 1),
+            "cloud_cover": cloud_record[i],
+            "foggy": fog_record[i] >= 50,
+            "thunderstorm": thunder_record[i] >= 60,
             "daylight": day,
             "moon": get_moon_phase(time),
             "time": time,
         }
 
         prec = {
-            "probability": twentyfour[prec_selector]["value"].fillna(0.0).iloc[i],
+            "probability": twentyfour.filter(prec_selector)["value"][i],
             "kind": PrecipitationType.RAIN
         }
 
-        rain_prob = twentyfour[rain_selector]["value"].fillna(0.0).iloc[i]
-        snow_prob = twentyfour[snow_selector]["value"].fillna(0.0).iloc[i]
-        frez_prob = twentyfour[frez_selector]["value"].fillna(0.0).iloc[i]
-        drizzle_prob = twentyfour[drizzle_selector]["value"].fillna(
-            0.0).iloc[i]
+        rain_prob = rain_record[i]
+        snow_prob = snow_record[i]
+        frez_prob = frez_record[i]
+        drizzle_prob = drizzle_record[i]
 
         max_prob = max(rain_prob, snow_prob, frez_prob, drizzle_prob)
 
