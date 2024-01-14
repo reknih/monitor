@@ -17,6 +17,8 @@ import wetter
 DEBUG = "--debug" in sys.argv
 REFRESH = 5 if DEBUG else 30
 
+# sys.path.append('~/e-Paper/RaspberryPi_JetsonNano/python/lib/')
+
 if DEBUG:
     import tkinter as tk
 else:
