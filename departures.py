@@ -25,6 +25,7 @@ def normalize_station_name(name):
     name = re.sub(r"^Betriebshof ", "BVG-Hof ", name)
     name = re.sub(r"Terminal", "T", name)
     name = re.sub(r"^Kurt-Schumacher-Platz", "Kutschi", name)
+    name = re.sub(r"\s?\(Berlin\)$", "", name)
     return name
 
 
@@ -338,7 +339,7 @@ class DepartureRetainer():
 
 
 def bvg_claim():
-    objekt = ["Dich", "Uns", "Bier", "Baden", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex",
+    objekt = ["Dich", "Uns", "Bier", "Baden", "Bananen", "Mittagessen", "es hier", "uns vier", "Papier", "Käse", "Wache", "den Alex",
               "Free Jazz", "uns alle", "Föderalismus", "Wowereits Vermächtnis", "Chillisauce", "Asphalt", "es bald", "im Wald"]
     verb = ["lieben", "schieben", "sieben", "ließen", "berieben", "übertrieben", "beschrieben", "besiedeln",
             "ziegeln", "zerrieben", "vertiefen", "fließen", "gießen", "siezen", "striezen", "stibitzen", "verdünisieren"]

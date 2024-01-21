@@ -6,6 +6,7 @@ from time import sleep
 import sys
 import locale
 import logging
+import typst
 
 from astral.sun import sun
 from PIL import Image, ImageDraw, ImageTk, ImageFont
@@ -13,6 +14,7 @@ import pytz
 
 import departures
 # import wetter
+import astro
 
 DEBUG = "--debug" in sys.argv
 REFRESH = 5 if DEBUG else 30
@@ -107,6 +109,8 @@ class App:
             self.draw_clock((195, 42))
             self.draw_forecast((63, 160))
             self.draw_departure_board((360, 43), depts, night=False)
+            if len(self.forecast) < 1:
+                self.draw_typst_info((63, 160))
         else:
             self.draw_background()
             self.draw_departure_board((91, 28), depts, night=True)
@@ -265,12 +269,25 @@ class App:
             icon = remove_transparency(Image.open(
                 f"img/sunrise.png")).resize((52, 50))
             self.im.paste(icon, (pos[0] - 52, pos[1] + 100))
-            # self.cv.text((pos[0] - 2, pos[1] + 133), sun(wetter.city.observer, date=datetime.now(pytz.utc), tzinfo=wetter.city.timezone)[
-            #              "sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
+            self.cv.text((pos[0] - 2, pos[1] + 133), sun(astro.city.observer, date=datetime.now(pytz.utc), tzinfo=astro.city.timezone)[
+                         "sunrise"].strftime("%H:%M"), 0, font=self.fonts["sunrise"], anchor="ls", align="left")
 
     def draw_forecast(self, pos):
         self.draw_hero_forecast(pos)
         self.draw_hourly_forecast((pos[0] + 45, pos[1] + 129))
+
+    def draw_typst_info(self, pos):
+        stars = typst.get_typst_stars()
+        if stars is not None:
+            self.cv.text((pos[0], pos[1] + 88), f"{stars}",
+                         0, font=self.fonts["temperature"], anchor="ls", align="center")
+            self.cv.text((pos[0] + 32, pos[1] + 120), "stars on typst/typst",
+                         0, font=self.fonts["sunrise"], anchor="ls", align="left")
+
+        online = typst.get_typst_online()
+        if online is not None:
+            self.cv.text((pos[0], pos[1] + 315), f"{online} online on typst.app",
+                         0, font=self.fonts["forecast-temp"], anchor="ls", align="left")
 
     def draw_hero_forecast(self, pos):
         if len(self.forecast) <= 0:
@@ -279,7 +296,7 @@ class App:
         forecast = self.forecast[0]
         # icon = remove_transparency(Image.open(
         #     f"img/{wetter.get_icon(forecast)}.png")).resize((110, 110))
-        self.im.paste(icon, pos)
+        # self.im.paste(icon, pos)
 
         self.cv.text((pos[0] + 115, pos[1] + 88), f"{round(forecast['temperature'])}°",
                      0, font=self.fonts["temperature"], anchor="ls", align="left")
@@ -308,29 +325,31 @@ class App:
         background.paste(
             tv_tower, (round(self.WIDTH * 0.845), bg_height - 218))
 
-        # moon_phase = wetter.get_moon_phase(
-        #     datetime.now(pytz.utc)).graphic_string()
+        moon_phase = astro.get_moon_phase(
+            datetime.now(pytz.utc)).graphic_string()
 
-        # if moon_phase != "new":
-        #     moon = Image.open(
-        #         f"img/moon_l_{moon_phase}-8.png").resize((200, 200))
-        #     background.paste(moon, (round(self.WIDTH * 0.0625), -20))
+        if moon_phase != "new":
+            moon = Image.open(
+                f"img/moon_l_{moon_phase}-8.png").resize((200, 200))
+            background.paste(moon, (round(self.WIDTH * 0.0625), -20))
 
+        cloud_cover = 30
         if len(self.forecast) > 0:
             cloud_cover = self.forecast[0]["cloud_cover"]
-            cloud_amount = max(min(7*cloud_cover/73 - 84/73, 7), 0)
-            cloud = Image.open(f"img/cloud-8.png")
-            cloud_dimensions = (147, 86)
-            cloud_band = 48
 
-            for _ in range(round(cloud_amount)):
-                scale = random() * .3 + .85
-                left = round(random() * self.WIDTH - cloud_dimensions[0] / 2)
-                offset = round(random() * cloud_band)
-                resized = cloud.resize(
-                    (round(cloud_dimensions[0] * scale), round(cloud_dimensions[1] * scale)))
-                background.paste(resized, (left, 15+offset),
-                                 resized.convert('RGBA'))
+        cloud_amount = max(min(7*cloud_cover/73 - 84/73, 7), 0)
+        cloud = Image.open(f"img/cloud-8.png")
+        cloud_dimensions = (147, 86)
+        cloud_band = 48
+
+        for _ in range(round(cloud_amount)):
+            scale = random() * .3 + .85
+            left = round(random() * self.WIDTH - cloud_dimensions[0] / 2)
+            offset = round(random() * cloud_band)
+            resized = cloud.resize(
+                (round(cloud_dimensions[0] * scale), round(cloud_dimensions[1] * scale)))
+            background.paste(resized, (left, 15+offset),
+                             resized.convert('RGBA'))
 
         self.im.paste(remove_transparency(background),
                       (0, self.HEIGHT - bg_height))
